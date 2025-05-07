@@ -2,46 +2,69 @@ const puppeteer = require("puppeteer");
 require("dotenv").config();
 
 const scrapeLogic = async (res) => {
-  console.log(process.env.NODE_ENV);
-  console.log(process.env.PUPPETEER_EXECUTABLE_PATH);
+  try {
+    console.log(process.env.NODE_ENV);
+    console.log(process.env.PUPPETEER_EXECUTABLE_PATH);
 
-  // Launch the browser and open a new blank page
-  const browser = await puppeteer.launch({
-    args: [
-      "--disable-setuid-sandbox",
-      "--no-sandbox",
-      "--single-process",
-      "--no-zygote",
-    ],
-    executablePath:
-      process.env.NODE_ENV === "production"
-        ? process.env.PUPPETEER_EXECUTABLE_PATH
-        : puppeteer.executablePath(),
-  });
-  console.log("Browser opened");
-  const page = await browser.newPage();
+    // Launch the browser and open a new blank page
+    const browser = await puppeteer.launch({
+      args: [
+        "--disable-setuid-sandbox",
+        "--no-sandbox",
+        "--single-process",
+        "--no-zygote",
+      ],
+      executablePath:
+        process.env.NODE_ENV === "production"
+          ? process.env.PUPPETEER_EXECUTABLE_PATH
+          : puppeteer.executablePath(),
+    });
+    console.log("Browser opened");
+    const page = await browser.newPage();
 
-  // Navigate to the developer chrome page
-  console.log("Navigating to URL");
-  await page.goto("https://developer.chrome.com/", {
-    waitUntil: "domcontentloaded",
-  });
+    // Navigate to the Twitch streamer's about page (hardcoded URL)
+    const url = "https://www.twitch.tv/hjune/about"; // Change this to the desired Twitch URL
+    console.log("Navigating to Twitch streamer's about page");
+    await page.goto(url, { waitUntil: "networkidle2" });
 
-  // Wait for the specific h2 element to appear
-  const elementId =
-    "#a-powerful-web-span-stylecolor-000-display-blockmade-easierspan";
-  await page.waitForSelector(elementId, { visible: true });
+    // Extract YouTube link or Gmail address
+    console.log("Extracting social media links and emails");
 
-  // Extract the text content
-  const text = await page.$eval(elementId, (el) => el.innerText.trim());
+    // Extract social media links
+    const links = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll("a[href]"))
+        .map((a) => a.href)
+        .filter(
+          (link) => link.includes("youtube.com") || link.includes("gmail.com") // Add other social media as needed
+        );
+    });
 
-  const logStatement = "Extracted text: " + text;
-  console.log(logStatement);
+    // Extract emails from page text (regex for email matching)
+    const emailsFromText = await page.evaluate(() => {
+      const text = document.body.innerText;
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+      return text.match(emailRegex) || [];
+    });
 
-  await browser.close();
+    // Merge the links and emails, removing duplicates
+    const result = [...new Set([...links, ...emailsFromText])];
 
-  // Send the extracted text in the response
-  res.send(logStatement);
+    // Logging and sending the extracted links/emails
+    const logStatement = `Extracted Links/Emails: ${result.join(", ")}`;
+    console.log(logStatement);
+
+    await browser.close();
+
+    // Send the extracted links and emails in the response
+    res.send(logStatement);
+  } catch (error) {
+    console.error("Error occurred during scraping:", error);
+    if (!res.headersSent) {
+      res
+        .status(500)
+        .send({ error: "Scraping failed", details: error.message });
+    }
+  }
 };
 
 module.exports = { scrapeLogic };
