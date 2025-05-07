@@ -38,7 +38,11 @@ const scrapeLogic = async (res) => {
 
     try {
       // Add timeout for debugging
-      await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 }); // 60 seconds timeout
+      await page.goto(url, {
+        waitUntil: "networkidle0",
+        timeout: 60000,
+        visible: true,
+      }); // 60 seconds timeout
       console.log("Page loaded successfully");
     } catch (err) {
       console.error("Error during page.goto:", err);
