@@ -2,6 +2,10 @@ const puppeteer = require("puppeteer");
 require("dotenv").config();
 
 const scrapeLogic = async (res) => {
+
+  console.log(process.env.NODE_ENV)
+  console.log(process.env.PUPPETEER_EXECUTABLE_PATH)
+
   // Launch the browser and open a new blank page
   const browser = await puppeteer.launch({
     args: [
@@ -15,23 +19,32 @@ const scrapeLogic = async (res) => {
         ? process.env.PUPPETEER_EXECUTABLE_PATH
         : puppeteer.executablePath(),
   });
+  console.log("Browser opened");
   const page = await browser.newPage();
 
   // Navigate the page to a URL
+  console.log("Navigating to URL");
   await page.goto("https://developer.chrome.com/");
 
   // Set screen size
+  console.log("Setting screen size");
   await page.setViewport({ width: 1080, height: 1024 });
 
   // Type into search box
+  console.log("Typing into search box");
   await page.type(".devsite-search-field", "automate beyond recorder");
 
   // Wait and click on first result
+  
+  console.log("Waiting and clicking on first result");
   const searchResultSelector = ".devsite-result-item-link";
+  console.log("Waiting for selector")
   await page.waitForSelector(searchResultSelector);
+  console.log("Selector found")
   await page.click(searchResultSelector);
 
   // Locate the full title with a unique string
+  console.log("Locating full title");
   const textSelector = await page.waitForSelector(
     "text/Customize and automate"
   );
