@@ -21,43 +21,27 @@ const scrapeLogic = async (res) => {
   console.log("Browser opened");
   const page = await browser.newPage();
 
-  // Navigate the page to a URL
+  // Navigate to the developer chrome page
   console.log("Navigating to URL");
-  await page.goto("https://developer.chrome.com/");
+  await page.goto("https://developer.chrome.com/", {
+    waitUntil: "domcontentloaded",
+  });
 
-  // Set screen size
-  console.log("Setting screen size");
-  await page.setViewport({ width: 1080, height: 1024 });
+  // Wait for the specific h2 element to appear
+  const elementId =
+    "#a-powerful-web-span-stylecolor-000-display-blockmade-easierspan";
+  await page.waitForSelector(elementId, { visible: true });
 
-  // Type into search box
-  console.log("Typing into search box");
-  await page.type(".devsite-search-field", "automate beyond recorder");
+  // Extract the text content
+  const text = await page.$eval(elementId, (el) => el.innerText.trim());
 
-  // Wait and click on first result
-
-  console.log("Waiting and clicking on first result");
-  const searchResultSelector = ".devsite-result-item-link";
-  console.log("Waiting for selector");
-  await page.waitForSelector(searchResultSelector, { visible: true });
-  console.log("Selector found");
-  const element = await page.$(searchResultSelector);
-  console.log("Element found");
-  await page.evaluate((el) => el.click(), element);
-  console.log("Element clicked");
-  // Locate the full title with a unique string
-  console.log("Locating full title");
-  const textSelector = await page.waitForSelector(
-    "text/Customize and automate"
-  );
-
-  // Print the full title
-  const fullTitle = await textSelector.evaluate((el) => el.textContent);
-
-  // Print the full title
-  const logStatement = `The title of this blog post is ${fullTitle}`;
+  const logStatement = "Extracted text: " + text;
   console.log(logStatement);
-  res.send(logStatement);
+
   await browser.close();
+
+  // Send the extracted text in the response
+  res.send(logStatement);
 };
 
 module.exports = { scrapeLogic };
