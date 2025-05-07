@@ -33,8 +33,6 @@ const scrapeLogic = async (res) => {
   console.log(logStatement);
   res.send(logStatement);
   await browser.close();
-
-  res.send({ fullTitle });
 };
 
 module.exports = { scrapeLogic };
