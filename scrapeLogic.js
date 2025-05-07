@@ -25,7 +25,7 @@ const scrapeLogic = async (res) => {
     // Navigate to the Twitch streamer's about page (hardcoded URL)
     const url = "https://www.twitch.tv/hjune/about"; // Change this to the desired Twitch URL
     console.log("Navigating to Twitch streamer's about page");
-    await page.goto(url);
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 0 });
 
     // Extract YouTube link or Gmail address
     console.log("Extracting social media links and emails");
