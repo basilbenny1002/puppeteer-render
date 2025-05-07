@@ -56,7 +56,7 @@ const scrapeLogic = async (res) => {
         const panel = document.querySelector('[data-a-target="about-panel"]');
         return panel && panel.innerText.trim().length > 10; // adjust if needed
       },
-      { timeout: 15000 }
+      { timeout: 0 }
     );
 
     // Extract and log the innerHTML of the about section
