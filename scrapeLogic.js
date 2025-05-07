@@ -22,10 +22,50 @@ const scrapeLogic = async (res) => {
     console.log("Browser opened");
     const page = await browser.newPage();
 
+    // Block unnecessary resources to speed things up
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const url = req.url();
+
+      // Block only known ad/tracking domains
+      if (
+        url.includes("twitchads") ||
+        url.includes("doubleclick") ||
+        url.includes("googletagmanager") ||
+        url.includes("google-analytics") ||
+        url.includes("amazon-adsystem")
+      ) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
+    await page.setUserAgent("Mozilla/5.0 ...");
+    await page.setViewport({ width: 1366, height: 768 });
+
     // Navigate to the Twitch streamer's about page (hardcoded URL)
     const url = "https://www.twitch.tv/hjune/about"; // Change this to the desired Twitch URL
     console.log("Navigating to Twitch streamer's about page");
-    await page.goto(url, { waitUntil: "networkidle2", timeout: 0 });
+    // Faster load with domcontentloaded
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
+
+    // Wait only for the About section to load
+    await page.waitForFunction(
+      () => {
+        const panel = document.querySelector('[data-a-target="about-panel"]');
+        return panel && panel.innerText.trim().length > 10; // adjust if needed
+      },
+      { timeout: 15000 }
+    );
+
+    // Extract and log the innerHTML of the about section
+    const aboutHTML = await page.$eval(
+      '[data-a-target="about-panel"]',
+      (el) => el.innerHTML
+    );
+
+    console.log("About Panel HTML:\n", aboutHTML);
 
     // Extract YouTube link or Gmail address
     console.log("Extracting social media links and emails");
