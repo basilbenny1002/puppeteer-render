@@ -13,16 +13,19 @@ const scrapeLogic = async (res) => {
     // Launch the browser and open a new blank page
     console.log("Launching browser...");
     const browser = await puppeteer.launch({
+      headless: true, // Explicitly set headless mode
       args: [
         "--disable-setuid-sandbox",
         "--no-sandbox",
         "--single-process",
         "--no-zygote",
+        "--disable-gpu",
       ],
       executablePath:
         process.env.NODE_ENV === "production"
           ? process.env.PUPPETEER_EXECUTABLE_PATH
           : puppeteer.executablePath(),
+      slowMo: 100, // Add delay between actions to make things less likely to break in an unfamiliar environment
     });
     console.log("Browser launched");
 
