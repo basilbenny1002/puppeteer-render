@@ -13,6 +13,7 @@ const scrapeLogic = async (res) => {
         "--no-sandbox",
         "--single-process",
         "--no-zygote",
+        "--disable-dev-shm-usage",
       ],
       executablePath:
         process.env.NODE_ENV === "production"
@@ -44,20 +45,22 @@ const scrapeLogic = async (res) => {
     await page.setUserAgent("Mozilla/5.0 ...");
     await page.setViewport({ width: 1366, height: 768 });
 
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+    });
+    await page.evaluate(() => {
+      document.body.style.transition = "none";
+    });
+
     // Navigate to the Twitch streamer's about page (hardcoded URL)
     const url = "https://www.twitch.tv/hjune/about"; // Change this to the desired Twitch URL
     console.log("Navigating to Twitch streamer's about page");
-    // Faster load with domcontentloaded
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
 
-    // Wait only for the About section to load
-    await page.waitForFunction(
-      () => {
-        const panel = document.querySelector('[data-a-target="about-panel"]');
-        return panel && panel.innerText.trim().length > 10; // adjust if needed
-      },
-      { timeout: 0 }
-    );
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 0 });
+    await page.waitForSelector('[data-a-target="about-panel"]', {
+      visible: true,
+      timeout: 0,
+    });
 
     // Extract and log the innerHTML of the about section
     const aboutHTML = await page.$eval(
