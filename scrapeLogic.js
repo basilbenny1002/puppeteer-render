@@ -96,7 +96,8 @@ const scrapeLogic = async (res) => {
 const page = await browser.newPage();
 await page.setUserAgent(randomUserAgent);
 
-await page.goto(url, { waitUntil: 'networkidle2' });
+await page.goto(url, { waitUntil: 'load', timeout: 30000 });
+await page.waitForTimeout(30000);
 
 // Extract social media links
 const links = await page.evaluate(() => {
