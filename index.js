@@ -4,16 +4,18 @@ const app = express();
 
 const PORT = process.env.PORT || 4000;
 
-app.get("/scrape", (req, res) => {
-  console.log("Scraping...");
-  scrapeLogic(res);
+app.use(express.json());
+
+app.post("/scrape", async (req, res) => {
+  const { url, timeout } = req.body;
+  console.log(`Received scrape request for: ${url}, timeout: ${timeout}`);
+  await scrapeLogic(res, url, timeout);
 });
 
 app.get("/", (req, res) => {
-  console.log("root render pputter server");
-  res.send("Render Puppeteer server is up and running!");
+  res.send("Puppeteer server is running!");
 });
 
 app.listen(PORT, () => {
-  console.log(`Listening on port ${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
 });

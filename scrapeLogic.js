@@ -1,13 +1,27 @@
 const puppeteer = require("puppeteer");
 require("dotenv").config();
 
-const scrapeLogic = async (res) => {
-  try {
-    console.log(process.env.NODE_ENV);
-    console.log(process.env.PUPPETEER_EXECUTABLE_PATH);
+const cache = {}; // Simple in-memory cache
+const CACHE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 
-    // Launch the browser and open a new blank page
-    const browser = await puppeteer.launch({
+const scrapeLogic = async (res, targetUrl, customTimeout) => {
+  const timeout = Number(customTimeout) || 10000;
+
+  if (!targetUrl || typeof targetUrl !== "string") {
+    return res.status(400).send({ error: "Invalid or missing URL" });
+  }
+
+  // Check cache first
+  const cached = cache[targetUrl];
+  const now = Date.now();
+  if (cached && now - cached.timestamp < CACHE_EXPIRY_MS) {
+    console.log(`Cache hit for ${targetUrl}`);
+    return res.send({ html: cached.html, cached: true });
+  }
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
       args: [
         "--disable-setuid-sandbox",
         "--no-sandbox",
@@ -19,149 +33,63 @@ const scrapeLogic = async (res) => {
           ? process.env.PUPPETEER_EXECUTABLE_PATH
           : puppeteer.executablePath(),
     });
-    console.log("Browser opened");
+
     const page = await browser.newPage();
 
-    // Block unnecessary resources to speed things up
     await page.setRequestInterception(true);
     page.on("request", (req) => {
-      const url = req.url();
-
-      // Block only known ad/tracking domains
-      if (
-        url.includes("twitchads") ||
-        url.includes("doubleclick") ||
-        url.includes("googletagmanager") ||
-        url.includes("google-analytics") ||
-        url.includes("amazon-adsystem")
-      ) {
-        req.abort();
-      } else {
-        req.continue();
-      }
+      const blocked = [
+        "twitchads", "doubleclick", "googletagmanager", "google-analytics", "amazon-adsystem"
+      ];
+      const shouldBlock = blocked.some((domain) => req.url().includes(domain));
+      shouldBlock ? req.abort() : req.continue();
     });
 
     await page.setUserAgent("Mozilla/5.0 ...");
     await page.setViewport({ width: 1366, height: 768 });
 
-    // Navigate to the Twitch streamer's about page (hardcoded URL)
-    const url = "https://www.twitch.tv/hjune/about"; // Change this to the desired Twitch URL
-    console.log("Navigating to Twitch streamer's about page");
-    // Faster load with domcontentloaded
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
+    console.log(`Navigating to ${targetUrl}`);
+    try {
+      await page.goto(targetUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: timeout,
+      });
+    } catch (err) {
+      console.warn("Navigation failed or timed out:", err.message);
+      return res.status(408).send({ error: "Navigation timeout or failure", details: err.message });
+    }
 
-    // Wait only for the About section to load
-    await page.waitForFunction(
-      () => {
-        const panel = document.querySelector('[data-a-target="about-panel"]');
-        return panel && panel.innerText.trim().length > 10; // adjust if needed
-      },
-      { timeout: 0 }
-    );
+    console.log(`Waiting ${timeout}ms before capturing HTML...`);
+    await new Promise((resolve) => setTimeout(resolve, timeout));
 
-    // Extract and log the innerHTML of the about section
-    const aboutHTML = await page.$eval(
-      '[data-a-target="about-panel"]',
-      (el) => el.innerHTML
-    );
-
-    console.log("About Panel HTML:\n", aboutHTML);
-
-    // Extract YouTube link or Gmail address
-    console.log("Extracting social media links and emails");
-
-    // Extract social media links
-    const links = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll("a[href]"))
-        .map((a) => a.href)
-        .filter(
-          (link) => link.includes("youtube.com") || link.includes("gmail.com") // Add other social media as needed
-        );
-    });
-
-    // Extract emails from page text (regex for email matching)
-    const emailsFromText = await page.evaluate(() => {
-      const text = document.body.innerText;
-      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-      return text.match(emailRegex) || [];
-    });
-
-    // Merge the links and emails, removing duplicates
-    const result = [...new Set([...links, ...emailsFromText])];
-
-    // Logging and sending the extracted links/emails
-    const logStatement = `Extracted Links/Emails: ${result.join(", ")}`;
-    console.log(logStatement);
-
+    const html = await page.content();
     await browser.close();
 
-    // Send the extracted links and emails in the response
-    res.send(logStatement);
+    // Save to cache
+    cache[targetUrl] = {
+      html,
+      timestamp: Date.now(),
+    };
+
+    return res.send({ html, cached: false });
   } catch (error) {
-    console.error("Error occurred during scraping:", error);
+    console.error("Scraping error:", error);
     if (!res.headersSent) {
-      res
-        .status(500)
-        .send({ error: "Scraping failed", details: error.message });
+      res.status(500).send({ error: "Internal scraping error", details: error.message });
     }
+    if (browser) await browser.close();
   }
 };
 
 module.exports = { scrapeLogic };
 
-// const puppeteer = require("puppeteer");
-// require("dotenv").config();
 
-// const scrapeLogic = async (res) => {
-//   const browser = await puppeteer.launch({
-//     args: [
-//       "--disable-setuid-sandbox",
-//       "--no-sandbox",
-//       "--single-process",
-//       "--no-zygote",
-//     ],
-//     executablePath:
-//       process.env.NODE_ENV === "production"
-//         ? process.env.PUPPETEER_EXECUTABLE_PATH
-//         : puppeteer.executablePath(),
-//   });
-// const page = await browser.newPage();
-
-// await page.goto(url, { waitUntil: 'networkidle2' });
-
-// // Extract social media links
-// const links = await page.evaluate(() => {
-//     return Array.from(document.querySelectorAll('a[href]'))
-//         .map(a => a.href)
-//         .filter(link =>
-//             link.includes('twitter.com') ||
-//             link.includes('instagram.com') ||
-//             link.includes('youtube.com') ||
-//             link.includes('tiktok.com') ||
-//             link.includes('discord.gg') ||
-//             link.includes('facebook.com') ||
-//             link.includes('linkedin.com')
-//         );
-// });
-
-// // Extract emails from page text
-// const emailsFromText = await page.evaluate(() => {
-//     const text = document.body.innerText;
-//     const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-//     return text.match(emailRegex) || [];
-// });
-
-// // Extract emails from the entire HTML source
-// const pageHTML = await page.content();
-// const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-// const emailsFromHTML = pageHTML.match(emailRegex) || [];
-
-// // Merge and remove duplicates
-// const emails = [...new Set([...emailsFromText, ...emailsFromHTML])];
-
-// await browser.close();
-// res.send({ links, emails });
-// }
-
-// const url = "https://www.twitch.tv/phoenixsclive/about";
-// module.exports = { scrapeLogic };
+setInterval(() => {
+  const now = Date.now();
+  for (const url in cache) {
+    if (now - cache[url].timestamp > CACHE_EXPIRY_MS) {
+      console.log(`Evicting cache for: ${url}`);
+      delete cache[url];
+    }
+  }
+}, 5 * 60 * 1000); // Run every 5 minutes
