@@ -20,7 +20,3 @@ app.post("/scrape", async (req, res) => {
 app.get("/", (req, res) => {
   res.send("Puppeteer scraping server running!");
 });
-
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
