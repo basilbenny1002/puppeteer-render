@@ -6,6 +6,11 @@ const PORT = process.env.PORT || 4000;
 
 app.use(express.json());
 
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on port ${PORT}`);
+});
+
+
 app.post("/scrape", async (req, res) => {
   const { url } = req.body;
   console.log(`Received scrape request for: ${url}`);
