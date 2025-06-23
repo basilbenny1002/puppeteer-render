@@ -21,5 +21,6 @@ app.get("/scrape", async (req, res) => {
   await scrapeLogic(res, url);
 });
 app.get("/", (req, res) => {
+  console.log("Recieved base get request")
   res.send("Puppeteer scraping server running!");
 });
