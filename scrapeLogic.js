@@ -66,7 +66,7 @@ const scrapeLogic = async (res, targetUrl) => {
   }
 };
 
-const scrapeTwitchAbout = async (res, url) => {
+const scrapeTwitchAbout = async (res, twitch_link) => {
    try {
     console.log(process.env.NODE_ENV);
     console.log(process.env.PUPPETEER_EXECUTABLE_PATH);
@@ -110,7 +110,7 @@ const scrapeTwitchAbout = async (res, url) => {
     await page.setViewport({ width: 1366, height: 768 });
 
     // Navigate to the Twitch streamer's about page (hardcoded URL)
-    // const url = "https://www.twitch.tv/hjune/about"; // Change this to the desired Twitch URL
+    const url = twitch_link; // Change this to the desired Twitch URL
     console.log("Navigating to Twitch streamer's about page");
     console.log(url);
     // Faster load with domcontentloaded
