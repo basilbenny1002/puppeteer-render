@@ -11,12 +11,15 @@ app.listen(PORT, '0.0.0.0', () => {
 });
 
 
-app.post("/scrape", async (req, res) => {
-  const { url } = req.body;
+app.get("/scrape", async (req, res) => {
+  const { url } = req.query;
+  if (!url) {
+    return res.status(400).send("Missing 'url' query parameter");
+  }
+
   console.log(`Received scrape request for: ${url}`);
   await scrapeLogic(res, url);
 });
-
 app.get("/", (req, res) => {
   res.send("Puppeteer scraping server running!");
 });
