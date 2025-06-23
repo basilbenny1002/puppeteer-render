@@ -67,53 +67,115 @@ const scrapeLogic = async (res, targetUrl) => {
 };
 
 const scrapeTwitchAbout = async (res, url) => {
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      args: ["--disable-setuid-sandbox", "--no-sandbox", "--single-process", "--no-zygote"],
-      executablePath:
-        process.env.NODE_ENV === "production"
-          ? process.env.PUPPETEER_EXECUTABLE_PATH
-          : puppeteer.executablePath(),
-    });
-
-    const page = await browser.newPage();
-    await page.setRequestInterception(true);
-    page.on("request", (req) => {
-      const blocked = ["twitchads", "doubleclick", "googletagmanager", "google-analytics", "amazon-adsystem"];
-      blocked.some((d) => req.url().includes(d)) ? req.abort() : req.continue();
-    });
-
-    await page.setUserAgent("Mozilla/5.0 ...");
-    await page.goto(url, { waitUntil: "domcontentloaded" });
-
-    // Wait for the about panel
-    await page.waitForSelector('[data-a-target="about-panel"]', { timeout: 30000 });
-
-    const links = await page.evaluate(() => {
-      const socialSites = ["youtube.com", "twitter.com", "instagram.com", "tiktok.com", "discord.gg", "facebook.com", "linkedin.com", "x.com"];
-      const anchors = Array.from(document.querySelectorAll("a[href]"));
-      return anchors
-        .map((a) => a.href)
-        .filter((href) => socialSites.some((site) => href.includes(site)));
-    });
-
-    const emails = await page.evaluate(() => {
-      const text = document.body.innerText;
-      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
-      return text.match(emailRegex) || [];
-    });
-
-    await browser.close();
-    return res.send({ extracted: [...new Set([...links, ...emails])] });
-  } catch (err) {
-    console.error("Twitch scraping error:", err);
-    if (!res.headersSent) {
-      res.status(500).send({ error: "Twitch scraping failed", details: err.message });
+   try {
+      console.log(process.env.NODE_ENV);
+      console.log(process.env.PUPPETEER_EXECUTABLE_PATH);
+  
+      // Launch the browser and open a new blank page
+      const browser = await puppeteer.launch({
+        args: [
+          "--disable-setuid-sandbox",
+          "--no-sandbox",
+          "--single-process",
+          "--no-zygote",
+          "--disable-features=site-per-process"
+        ],
+        headless: true,
+        executablePath:
+          process.env.NODE_ENV === "production"
+            ? process.env.PUPPETEER_EXECUTABLE_PATH
+            : puppeteer.executablePath(),
+      });
+      console.log("Browser opened");
+      const page = await browser.newPage();
+  
+      // Block unnecessary resources to speed things up
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const url = req.url();
+  
+        // Block only known ad/tracking domains
+        if (
+          url.includes("twitchads") ||
+          url.includes("doubleclick") ||
+          url.includes("googletagmanager") ||
+          url.includes("google-analytics") ||
+          url.includes("amazon-adsystem")
+        ) {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      });
+  
+      await page.setUserAgent("Mozilla/5.0 ...");
+  
+      // Navigate to the Twitch streamer's about page (hardcoded URL)
+      //const url = "https://x.com/sinatraa"; // Change this to the desired Twitch URL
+      console.log("Navigating to Twitch streamer's about page");
+      // Faster load with domcontentloaded
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
+  
+      // // Wait only for the About section to load
+      // await page.waitForFunction(
+      //   () => {
+      //     const panel = document.querySelector('[data-a-target="about-panel"]');
+      //     return panel && panel.innerText.trim().length > 10; // adjust if needed
+      //   },
+      //   { timeout: 0 }
+      // );
+  
+      // Extract and log the innerHTML of the about section
+      const aboutHTML = await page.$eval(
+        '[data-a-target="about-panel"]',
+        (el) => el.innerHTML
+      );
+  
+      // console.log("About Panel HTML:\n", aboutHTML);
+      // const content = await page.content();
+      // await fs.writeFile("page.html", content, "utf8");
+  
+      // Extract YouTube link or Gmail address
+      console.log("Extracting social media links and emails");
+  
+      // Extract social media links
+      const links = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll("a[href]"))
+          .map((a) => a.href)
+          .filter(
+            (link) => link.includes("youtube.com") || link.includes("x.com") || link.includes("twitter.com") || link.includes("facebook.com") || link.includes("instagram.com") || link.includes("linkedin.com") // Add other social media as needed
+          );
+      });
+  
+      // Extract emails from page text (regex for email matching)
+      const emailsFromText = await page.evaluate(() => {
+        const text = document.body.innerText;
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+        return text.match(emailRegex) || [];
+      });
+  
+      // Merge the links and emails, removing duplicates
+      const result = [...new Set([...links, ...emailsFromText])];
+  
+      // Logging and sending the extracted links/emails
+      const logStatement = `Extracted Links/Emails: ${result.join(", ")}`;
+      console.log(logStatement);
+  
+      await browser.close();
+  
+      // Send the extracted links and emails in the response
+      res.send(logStatement);
+    } catch (error) {
+      console.error("Error occurred during scraping:", error);
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .send({ error: "Scraping failed", details: error.message });
+      }
     }
-    if (browser) await browser.close();
-  }
-};
+  };
+  
+
 
 const scrapeInstagram = async (res, url) => {
   let browser;
