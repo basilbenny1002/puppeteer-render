@@ -7,13 +7,13 @@ const PORT = process.env.PORT || 4000;
 app.use(express.json());
 
 app.post("/scrape", async (req, res) => {
-  const { url, timeout } = req.body;
-  console.log(`Received scrape request for: ${url}, timeout: ${timeout}`);
-  await scrapeLogic(res, url, timeout);
+  const { url } = req.body;
+  console.log(`Received scrape request for: ${url}`);
+  await scrapeLogic(res, url);
 });
 
 app.get("/", (req, res) => {
-  res.send("Puppeteer server is running!");
+  res.send("Puppeteer scraping server running!");
 });
 
 app.listen(PORT, () => {

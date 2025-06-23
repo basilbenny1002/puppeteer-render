@@ -1,17 +1,25 @@
 const puppeteer = require("puppeteer");
 require("dotenv").config();
 
-const cache = {}; // Simple in-memory cache
-const CACHE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+const cache = {};
+const CACHE_EXPIRY_MS = 10 * 60 * 1000;
 
-const scrapeLogic = async (res, targetUrl, customTimeout) => {
-  const timeout = Number(customTimeout) || 10000;
-
+const scrapeLogic = async (res, targetUrl) => {
   if (!targetUrl || typeof targetUrl !== "string") {
     return res.status(400).send({ error: "Invalid or missing URL" });
   }
 
-  // Check cache first
+  // Handle Instagram: return full HTML after 10s
+  if (targetUrl.includes("instagram.com")) {
+    return scrapeInstagram(res, targetUrl);
+  }
+
+  // Handle Twitch About panel scraping
+  if (targetUrl.includes("twitch.tv")) {
+    return scrapeTwitchAbout(res, targetUrl);
+  }
+
+  // Default logic with cache
   const cached = cache[targetUrl];
   const now = Date.now();
   if (cached && now - cached.timestamp < CACHE_EXPIRY_MS) {
@@ -22,12 +30,7 @@ const scrapeLogic = async (res, targetUrl, customTimeout) => {
   let browser;
   try {
     browser = await puppeteer.launch({
-      args: [
-        "--disable-setuid-sandbox",
-        "--no-sandbox",
-        "--single-process",
-        "--no-zygote",
-      ],
+      args: ["--disable-setuid-sandbox", "--no-sandbox", "--single-process", "--no-zygote"],
       executablePath:
         process.env.NODE_ENV === "production"
           ? process.env.PUPPETEER_EXECUTABLE_PATH
@@ -35,12 +38,9 @@ const scrapeLogic = async (res, targetUrl, customTimeout) => {
     });
 
     const page = await browser.newPage();
-
     await page.setRequestInterception(true);
     page.on("request", (req) => {
-      const blocked = [
-        "twitchads", "doubleclick", "googletagmanager", "google-analytics", "amazon-adsystem"
-      ];
+      const blocked = ["twitchads", "doubleclick", "googletagmanager", "google-analytics", "amazon-adsystem"];
       const shouldBlock = blocked.some((domain) => req.url().includes(domain));
       shouldBlock ? req.abort() : req.continue();
     });
@@ -49,47 +49,161 @@ const scrapeLogic = async (res, targetUrl, customTimeout) => {
     await page.setViewport({ width: 1366, height: 768 });
 
     console.log(`Navigating to ${targetUrl}`);
-    try {
-      await page.goto(targetUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: timeout,
-      });
-    } catch (err) {
-      console.warn("Navigation failed or timed out:", err.message);
-      return res.status(408).send({ error: "Navigation timeout or failure", details: err.message });
-    }
-
-    console.log(`Waiting ${timeout}ms before capturing HTML...`);
-    await new Promise((resolve) => setTimeout(resolve, timeout));
+    await page.goto(targetUrl, { waitUntil: "domcontentloaded" });
+    await new Promise((resolve) => setTimeout(resolve, 10000));
 
     const html = await page.content();
     await browser.close();
 
-    // Save to cache
-    cache[targetUrl] = {
-      html,
-      timestamp: Date.now(),
-    };
-
+    cache[targetUrl] = { html, timestamp: Date.now() };
     return res.send({ html, cached: false });
   } catch (error) {
     console.error("Scraping error:", error);
     if (!res.headersSent) {
-      res.status(500).send({ error: "Internal scraping error", details: error.message });
+      res.status(500).send({ error: "Scraping failed", details: error.message });
+    }
+    if (browser) await browser.close();
+  }
+};
+
+const scrapeTwitchAbout = async (res, url) => {
+   try {
+      console.log(process.env.NODE_ENV);
+      console.log(process.env.PUPPETEER_EXECUTABLE_PATH);
+  
+      // Launch the browser and open a new blank page
+      const browser = await puppeteer.launch({
+        args: [
+          "--disable-setuid-sandbox",
+          "--no-sandbox",
+          "--single-process",
+          "--no-zygote",
+          "--disable-features=site-per-process"
+        ],
+        headless: true,
+        executablePath:
+          process.env.NODE_ENV === "production"
+            ? process.env.PUPPETEER_EXECUTABLE_PATH
+            : puppeteer.executablePath(),
+      });
+      console.log("Browser opened");
+      const page = await browser.newPage();
+  
+      // Block unnecessary resources to speed things up
+      await page.setRequestInterception(true);
+      page.on("request", (req) => {
+        const url = req.url();
+  
+        // Block only known ad/tracking domains
+        if (
+          url.includes("twitchads") ||
+          url.includes("doubleclick") ||
+          url.includes("googletagmanager") ||
+          url.includes("google-analytics") ||
+          url.includes("amazon-adsystem")
+        ) {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      });
+  
+      await page.setUserAgent("Mozilla/5.0 ...");
+  
+      // Navigate to the Twitch streamer's about page (hardcoded URL)
+      //const url = "https://x.com/sinatraa"; // Change this to the desired Twitch URL
+      console.log("Navigating to Twitch streamer's about page");
+      // Faster load with domcontentloaded
+      await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
+  
+      // // Wait only for the About section to load
+      // await page.waitForFunction(
+      //   () => {
+      //     const panel = document.querySelector('[data-a-target="about-panel"]');
+      //     return panel && panel.innerText.trim().length > 10; // adjust if needed
+      //   },
+      //   { timeout: 0 }
+      // );
+  
+      // Extract and log the innerHTML of the about section
+      const aboutHTML = await page.$eval(
+        '[data-a-target="about-panel"]',
+        (el) => el.innerHTML
+      );
+  
+      // console.log("About Panel HTML:\n", aboutHTML);
+      // const content = await page.content();
+      // await fs.writeFile("page.html", content, "utf8");
+  
+      // Extract YouTube link or Gmail address
+      console.log("Extracting social media links and emails");
+  
+      // Extract social media links
+      const links = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll("a[href]"))
+          .map((a) => a.href)
+          .filter(
+            (link) => link.includes("youtube.com") || link.includes("x.com") || link.includes("twitter.com") || link.includes("facebook.com") || link.includes("instagram.com") || link.includes("linkedin.com") // Add other social media as needed
+          );
+      });
+  
+      // Extract emails from page text (regex for email matching)
+      const emailsFromText = await page.evaluate(() => {
+        const text = document.body.innerText;
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+        return text.match(emailRegex) || [];
+      });
+  
+      // Merge the links and emails, removing duplicates
+      const result = [...new Set([...links, ...emailsFromText])];
+  
+      // Logging and sending the extracted links/emails
+      const logStatement = `Extracted Links/Emails: ${result.join(", ")}`;
+      console.log(logStatement);
+  
+      await browser.close();
+  
+      // Send the extracted links and emails in the response
+      res.send(logStatement);
+    } catch (error) {
+      console.error("Error occurred during scraping:", error);
+      if (!res.headersSent) {
+        res
+          .status(500)
+          .send({ error: "Scraping failed", details: error.message });
+      }
+    }
+  };
+  
+
+
+const scrapeInstagram = async (res, url) => {
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      args: ["--disable-setuid-sandbox", "--no-sandbox", "--single-process", "--no-zygote"],
+      executablePath:
+        process.env.NODE_ENV === "production"
+          ? process.env.PUPPETEER_EXECUTABLE_PATH
+          : puppeteer.executablePath(),
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent("Mozilla/5.0 ...");
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+
+    await new Promise((r) => setTimeout(r, 10000));
+    const html = await page.content();
+    await browser.close();
+
+    return res.send({ html });
+  } catch (err) {
+    console.error("Instagram scraping error:", err);
+    if (!res.headersSent) {
+      res.status(500).send({ error: "Instagram scraping failed", details: err.message });
     }
     if (browser) await browser.close();
   }
 };
 
 module.exports = { scrapeLogic };
-
-
-setInterval(() => {
-  const now = Date.now();
-  for (const url in cache) {
-    if (now - cache[url].timestamp > CACHE_EXPIRY_MS) {
-      console.log(`Evicting cache for: ${url}`);
-      delete cache[url];
-    }
-  }
-}, 5 * 60 * 1000); // Run every 5 minutes
