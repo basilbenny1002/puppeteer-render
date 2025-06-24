@@ -156,13 +156,26 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
     const result = [...new Set([...links, ...emailsFromText])];
 
     // Logging and sending the extracted links/emails
-    const logStatement = `Extracted Links/Emails: ${result.join(", ")}`;
-    console.log(logStatement);
+    // const logStatement = `Extracted Links/Emails: ${result.join(", ")}`;
+    // console.log(logStatement);
 
+    // await browser.close();
+
+    // // Send the extracted links and emails in the response
+    // res.send(logStatement);
     await browser.close();
 
-    // Send the extracted links and emails in the response
-    res.send(logStatement);
+  // Separate links and emails
+  const socialLinks = result.filter(link => link.includes("http"));
+  const emailAddresses = result.filter(item => item.includes("@") && !item.includes("http"));
+
+  // Send structured JSON response
+  res.status(200).json({
+    status: "success",
+    links: socialLinks,
+    emails: emailAddresses
+  });
+
   } catch (error) {
     console.error("Error occurred during scraping:", error);
     if (!res.headersSent) {
