@@ -1,5 +1,9 @@
-const puppeteer = require("puppeteer");
+// const puppeteer = require("puppeteer");
 require("dotenv").config();
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+
+puppeteer.use(StealthPlugin());
 
 const cache = {};
 const CACHE_EXPIRY_MS = 10 * 60 * 1000;
@@ -20,12 +24,12 @@ const scrapeLogic = async (res, targetUrl) => {
   }
 
   // Default logic with cache
-  const cached = cache[targetUrl];
-  const now = Date.now();
-  if (cached && now - cached.timestamp < CACHE_EXPIRY_MS) {
-    console.log(`Cache hit for ${targetUrl}`);
-    return res.send({ html: cached.html, cached: true });
-  }
+  // const cached = cache[targetUrl];
+  // const now = Date.now();
+  // if (cached && now - cached.timestamp < CACHE_EXPIRY_MS) {
+  //   console.log(`Cache hit for ${targetUrl}`);
+  //   return res.send({ html: cached.html, cached: true });
+  // }
 
   let browser;
   try {
@@ -86,6 +90,20 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
     });
     console.log("Browser opened");
     const page = await browser.newPage();
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+    );
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'en-US,en;q=0.9',
+    });
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'platform', {
+        get: () => 'Win32',
+      });
+      Object.defineProperty(Intl.DateTimeFormat.prototype, 'resolvedOptions', {
+        value: () => ({ timeZone: 'Asia/Kolkata' }),
+      });
+    });
 
     // Block unnecessary resources to speed things up
     await page.setRequestInterception(true);
@@ -106,7 +124,7 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
       }
     });
 
-    await page.setUserAgent("Mozilla/5.0 ...");
+    // await page.setUserAgent("Mozilla/5.0 ...");
     await page.setViewport({ width: 1366, height: 768 });
 
     // Navigate to the Twitch streamer's about page (hardcoded URL)
