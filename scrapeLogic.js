@@ -150,10 +150,10 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
       { timeout: 0 }
     );
     await page.mouse.move(200, 200, { steps: 20 }); // Smooth movement
-  await page.waitForTimeout(500);
+  // await page.waitForTimeout(500);
 
   await page.mouse.move(300, 300, { steps: 15 });
-  await page.waitForTimeout(1000);
+  // await page.waitForTimeout(1000);
     // Wait only for the About section to load
   //   await page.waitForFunction(() => {
   //     const panel = document.querySelector('[data-a-target="about-panel"]');
