@@ -121,20 +121,19 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
       const panel = document.querySelector('[data-a-target="about-panel"]');
       if (!panel) return false;
 
-      const height = panel.offsetHeight;
-      const count = panel.children.length;
+      const count = panel.querySelectorAll('a').length;
 
-      if (!window.__lastStateCheck) {
-        window.__lastStateCheck = { height, count, time: Date.now() };
+      if (!window.__lastLinkCheck) {
+        window.__lastLinkCheck = { count, time: Date.now() };
         return false;
       }
 
-      if (window.__lastStateCheck.height !== height || window.__lastStateCheck.count !== count) {
-        window.__lastStateCheck = { height, count, time: Date.now() };
+      if (window.__lastLinkCheck.count !== count) {
+        window.__lastLinkCheck = { count, time: Date.now() };
         return false;
       }
 
-      return Date.now() - window.__lastStateCheck.time > 500; // settled for 500ms
+    return Date.now() - window.__lastLinkCheck.time > 500; // no new links for 500ms
   }, { timeout: 10000 });
 
 
@@ -143,8 +142,9 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
       '[data-a-target="about-panel"]',
       (el) => el.innerHTML
     );
-
     console.log("About Panel HTML:\n", aboutHTML);
+    const fullHtml = await page.content();
+    console.log(fullHtml);
 
     // Extract YouTube link or Gmail address
     console.log("Extracting social media links and emails");
