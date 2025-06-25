@@ -133,14 +133,27 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
     console.log("Navigating to Twitch streamer's about page");
     console.log(url);
     // Faster load with domcontentloaded
+    
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
-        await page.waitForFunction(
+    await page.mouse.move(200, 200, { steps: 20 });
+    await page.evaluate(() => {
+    window.scrollBy({ top: 300, behavior: 'smooth' });
+  });
+  await page.evaluate(() => {
+  window.scrollBy({ top: -100, behavior: 'smooth' });
+});
+    await page.waitForFunction(
       () => {
         const panel = document.querySelector('[data-a-target="about-panel"]');
         return panel && panel.innerText.trim().length > 10; // adjust if needed
       },
       { timeout: 0 }
     );
+    await page.mouse.move(200, 200, { steps: 20 }); // Smooth movement
+  await page.waitForTimeout(500);
+
+  await page.mouse.move(300, 300, { steps: 15 });
+  await page.waitForTimeout(1000);
     // Wait only for the About section to load
   //   await page.waitForFunction(() => {
   //     const panel = document.querySelector('[data-a-target="about-panel"]');
