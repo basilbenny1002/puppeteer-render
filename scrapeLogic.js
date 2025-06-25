@@ -143,8 +143,13 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
       (el) => el.innerHTML
     );
     console.log("About Panel HTML:\n", aboutHTML);
-    const fullHtml = await page.content();
-    console.log(fullHtml);
+    const hrefs = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('a'))
+                  .map(a => a.href)
+                  .filter(href => href && href.trim() !== '');
+    });
+
+console.log(hrefs);
 
     // Extract YouTube link or Gmail address
     console.log("Extracting social media links and emails");
