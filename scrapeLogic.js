@@ -3,6 +3,10 @@ require("dotenv").config();
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 puppeteer.use(StealthPlugin());
 
 const cache = {};
@@ -77,6 +81,7 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
 
     // Launch the browser and open a new blank page
     const browser = await puppeteer.launch({
+      headless: false,
       args: [
         "--disable-setuid-sandbox",
         "--no-sandbox",
@@ -133,26 +138,33 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
     console.log(url);
     // Faster load with domcontentloaded
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
-
+      await page.waitForFunction(
+        () => {
+          sleep(2000);
+          const panel = document.querySelector('[data-a-target="about-panel"]');
+          return panel && panel.innerText.trim().length > 10; // adjust if needed
+        },
+        { timeout: 0 }
+      );
     // Wait only for the About section to load
-    await page.waitForFunction(() => {
-      const panel = document.querySelector('[data-a-target="about-panel"]');
-      if (!panel) return false;
+  //   await page.waitForFunction(() => {
+  //     const panel = document.querySelector('[data-a-target="about-panel"]');
+  //     if (!panel) return false;
 
-      const count = panel.querySelectorAll('a').length;
+  //     const count = panel.querySelectorAll('a').length;
 
-      if (!window.__lastLinkCheck) {
-        window.__lastLinkCheck = { count, time: Date.now() };
-        return false;
-      }
+  //     if (!window.__lastLinkCheck) {
+  //       window.__lastLinkCheck = { count, time: Date.now() };
+  //       return false;
+  //     }
 
-      if (window.__lastLinkCheck.count !== count) {
-        window.__lastLinkCheck = { count, time: Date.now() };
-        return false;
-      }
+  //     if (window.__lastLinkCheck.count !== count) {
+  //       window.__lastLinkCheck = { count, time: Date.now() };
+  //       return false;
+  //     }
 
-    return Date.now() - window.__lastLinkCheck.time > 500; // no new links for 500ms
-  }, { timeout: 10000 });
+  //   return Date.now() - window.__lastLinkCheck.time > 500; // no new links for 500ms
+  // }, { timeout: 10000 });
 
 
     // Extract and log the innerHTML of the about section
