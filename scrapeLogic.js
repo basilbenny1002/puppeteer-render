@@ -117,13 +117,26 @@ const scrapeTwitchAbout = async (res, twitch_link) => {
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
 
     // Wait only for the About section to load
-    await page.waitForFunction(
-      () => {
-        const panel = document.querySelector('[data-a-target="about-panel"]');
-        return panel && panel.innerText.trim().length > 10; // adjust if needed
-      },
-      { timeout: 0 }
-    );
+    await page.waitForFunction(() => {
+      const panel = document.querySelector('[data-a-target="about-panel"]');
+      if (!panel) return false;
+
+      const height = panel.offsetHeight;
+      const count = panel.children.length;
+
+      if (!window.__lastStateCheck) {
+        window.__lastStateCheck = { height, count, time: Date.now() };
+        return false;
+      }
+
+      if (window.__lastStateCheck.height !== height || window.__lastStateCheck.count !== count) {
+        window.__lastStateCheck = { height, count, time: Date.now() };
+        return false;
+      }
+
+      return Date.now() - window.__lastStateCheck.time > 500; // settled for 500ms
+  }, { timeout: 10000 });
+
 
     // Extract and log the innerHTML of the about section
     const aboutHTML = await page.$eval(
