@@ -1,5 +1,6 @@
 const puppeteer = require("puppeteer");
 require("dotenv").config();
+const fs = require("fs").promises;
 
 const scrapeLogic = async (res) => {
   try {
@@ -14,6 +15,7 @@ const scrapeLogic = async (res) => {
         "--single-process",
         "--no-zygote",
       ],
+      headless: true,
       executablePath:
         process.env.NODE_ENV === "production"
           ? process.env.PUPPETEER_EXECUTABLE_PATH
@@ -42,30 +44,31 @@ const scrapeLogic = async (res) => {
     });
 
     await page.setUserAgent("Mozilla/5.0 ...");
-    await page.setViewport({ width: 1366, height: 768 });
 
     // Navigate to the Twitch streamer's about page (hardcoded URL)
-    const url = "https://www.twitch.tv/hjune/about"; // Change this to the desired Twitch URL
+    const url = "https://x.com/sinatraa"; // Change this to the desired Twitch URL
     console.log("Navigating to Twitch streamer's about page");
     // Faster load with domcontentloaded
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
 
-    // Wait only for the About section to load
-    await page.waitForFunction(
-      () => {
-        const panel = document.querySelector('[data-a-target="about-panel"]');
-        return panel && panel.innerText.trim().length > 10; // adjust if needed
-      },
-      { timeout: 0 }
-    );
+    // // Wait only for the About section to load
+    // await page.waitForFunction(
+    //   () => {
+    //     const panel = document.querySelector('[data-a-target="about-panel"]');
+    //     return panel && panel.innerText.trim().length > 10; // adjust if needed
+    //   },
+    //   { timeout: 0 }
+    // );
 
-    // Extract and log the innerHTML of the about section
-    const aboutHTML = await page.$eval(
-      '[data-a-target="about-panel"]',
-      (el) => el.innerHTML
-    );
+    // // Extract and log the innerHTML of the about section
+    // const aboutHTML = await page.$eval(
+    //   '[data-a-target="about-panel"]',
+    //   (el) => el.innerHTML
+    // );
 
-    console.log("About Panel HTML:\n", aboutHTML);
+    // console.log("About Panel HTML:\n", aboutHTML);
+    const content = await page.content();
+    await fs.writeFile("page.html", content, "utf8");
 
     // Extract YouTube link or Gmail address
     console.log("Extracting social media links and emails");
