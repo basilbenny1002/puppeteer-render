@@ -46,10 +46,10 @@ const scrapeLogic = async (res) => {
     await page.setUserAgent("Mozilla/5.0 ...");
 
     // Navigate to the Twitch streamer's about page (hardcoded URL)
-    const url = "https://www.twitch.tv/thinkingmansvalo/about"; // Change this to the desired Twitch URL
+    const url = "https://www.twitch.tv/mooda/about"; // Change this to the desired Twitch URL
     console.log("Navigating to Twitch streamer's about page");
     // Faster load with domcontentloaded
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 0 });
+    await page.goto(url, { waitUntil: "networkidle2", timeout: 0 });
 
     // // Wait only for the About section to load
     await page.waitForFunction(
@@ -70,7 +70,6 @@ const scrapeLogic = async (res) => {
     const content = await page.content();
     await fs.writeFile("page.html", content, "utf8");
     await fs.writeFile("about.html", aboutHTML, "utf8");
-
 
     // Extract YouTube link or Gmail address
     console.log("Extracting social media links and emails");
